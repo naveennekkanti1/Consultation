@@ -8,20 +8,21 @@
     <groupId>org.example</groupId>
     <artifactId>Consultation</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <name>Consultation</name>
+    <description>SolAI Consultation Backend</description>
 
-    <properties>
-        <java.version>17</java.version>
-        <spring.boot.version>3.3.4</spring.boot.version>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
-
-    <!-- Use Spring Boot parent for dependency management -->
+    <!-- ✅ FIXED: Use a static version for the parent -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>${spring.boot.version}</version>
-        <relativePath/>
+        <version>3.3.4</version>
+        <relativePath/> <!-- lookup parent from repository -->
     </parent>
+
+    <properties>
+        <java.version>17</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
 
     <dependencies>
 
@@ -83,6 +84,7 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Google Calendar API -->
         <dependency>
             <groupId>com.google.api-client</groupId>
             <artifactId>google-api-client</artifactId>
@@ -101,7 +103,6 @@
             <version>1.17.0</version>
         </dependency>
 
-
     </dependencies>
 
     <build>
@@ -115,6 +116,12 @@
                     <source>${java.version}</source>
                     <target>${java.version}</target>
                 </configuration>
+            </plugin>
+
+            <!-- Spring Boot Maven Plugin -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
         </plugins>
     </build>
