@@ -73,7 +73,7 @@ public class EmailServiceNewsLetter {
                             <li>Exclusive tips and strategies</li>
                             <li>Industry news and updates</li>
                         </ul>
-                        <a href="https://localhost:3000" class="button">Visit Our Website</a>
+                        <a href="https://aisolai.vercel.app" class="button">Visit Our Website</a>
                     </div>
                     <div class="footer">
                         <p>© 2023 SolAi. All rights reserved.</p>
@@ -111,7 +111,7 @@ public class EmailServiceNewsLetter {
                         <p>© 2023 SolAi. All rights reserved.</p>
                         <p>24th Main Road,HSR Layout, Bengaluru, Karnataka, 560013</p>
                         <div class="unsubscribe">
-                            <p>Don't want to receive these emails? <a href="aisol" style="color: #2563eb;">Unsubscribe</a></p>
+                            <p>Don't want to receive these emails? <a href="https://aisolai.vercel.app/unsubscribe" style="color: #2563eb;">Unsubscribe</a></p>
                         </div>
                     </div>
                 </div>
