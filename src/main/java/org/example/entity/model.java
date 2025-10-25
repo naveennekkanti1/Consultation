@@ -1,11 +1,15 @@
 package org.example.entity;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.mapping.Document;
 import lombok.Data;
 
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 
 @Data
 @AllArgsConstructor
@@ -27,7 +31,10 @@ public class model {
     private String budgetRange;
     @JsonProperty("description")
     private String projectDescription;
-    private Instant createdAt= Instant.now();
+    @CreatedDate
+    private ZonedDateTime createdAt = ZonedDateTime.now(ZoneId.of("Asia/Kolkata"));
+    @LastModifiedDate
+    private Instant updatedAt;
     private String status = "received";
 
 }
