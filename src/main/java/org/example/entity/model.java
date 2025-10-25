@@ -28,5 +28,6 @@ public class model {
     @JsonProperty("description")
     private String projectDescription;
     private Instant createdAt= Instant.now();
+    private String status = "received";
 
 }

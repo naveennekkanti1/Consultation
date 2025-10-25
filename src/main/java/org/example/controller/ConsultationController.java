@@ -9,6 +9,7 @@ import org.example.repository.consultationRepository;
 import org.example.service.EmailService;
 import org.example.service.GoogleMeetService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -110,6 +111,43 @@ public class ConsultationController {
         } catch (Exception e) {
             return ResponseEntity.status(SCHEDULED_FAILED)
                     .body("Message Sent Failed: " + e.getMessage());
+        }
+    }
+
+    // Add to ConsultationController.java
+
+    @GetMapping("/all")
+    public ResponseEntity<?> getAllConsultations() {
+        try {
+            List<model> consultations = repository.findAll();
+            return ResponseEntity.ok(consultations);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error fetching consultations: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/update-status/{id}")
+    public ResponseEntity<?> updateConsultationStatus(
+            @PathVariable String id,
+            @RequestBody Map<String, String> statusUpdate) {
+        try {
+            Optional<model> consultationOpt = repository.findById(id);
+
+            if (consultationOpt.isPresent()) {
+                model consultation = consultationOpt.get();
+                consultation.setStatus(statusUpdate.get("status"));
+                repository.save(consultation);
+
+                return ResponseEntity.ok()
+                        .body(Map.of("success", true, "message", "Status updated successfully"));
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("success", false, "message", "Consultation not found"));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("success", false, "message", "Error updating status: " + e.getMessage()));
         }
     }
 

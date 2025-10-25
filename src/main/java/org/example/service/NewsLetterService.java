@@ -81,7 +81,7 @@ public class NewsLetterService {
 
     public boolean isSubscribed(String email) {
         return newsletterRepository.findByEmail(email)
-                .map(NewsLetterModel::isSubscribed) // assuming your field is 'isSubscribed'
+                .map(NewsLetterModel::isSubscribed)
                 .orElse(false);
     }
 

@@ -20,7 +20,7 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequestMapping("/newsletter")
-@CrossOrigin(origins = "https://aisolai.vercel.app")
+@CrossOrigin(origins = "*")
 public class NewsLetterController {
 
     @Autowired
