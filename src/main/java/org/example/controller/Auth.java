@@ -5,7 +5,6 @@ import org.example.entity.UserModel;
 import org.example.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -19,8 +18,6 @@ public class Auth {
 
     @Autowired
     private UserRepository userRepository;
-
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> payload) {
@@ -36,7 +33,7 @@ public class Auth {
                     .body(errorResponse);
         }
         UserModel user = existingUser.get();
-        if (!passwordEncoder.matches(password, user.getPassword())) {
+        if (!user.getPassword().equals(password)) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("code", responsecode.UNAUTHORIZED);
             errorResponse.put("message", "Invalid email or password");
