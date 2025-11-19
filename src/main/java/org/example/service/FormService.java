@@ -1,5 +1,8 @@
 package org.example.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.entity.Form;
 import org.example.entity.FormResponse;
 import org.example.repository.FormRepository;
@@ -119,22 +122,66 @@ public class FormService {
 
             String email = null;
 
-            // Extract email from answers array
-            if (response.getAnswers() instanceof List<?>) {
-                List<Map<String, Object>> answersList = (List<Map<String, Object>>) response.getAnswers();
-                for (Map<String, Object> ans : answersList) {
-                    Object question = ans.get("question");
-                    if (question != null && "email".equalsIgnoreCase(question.toString())) {
-                        email = (String) ans.get("answer");
-                        break;
+            Object answersObj = response.getAnswers();
+
+            try {
+                // Case 1: Already a List of LinkedHashMaps (from JSON)
+                if (answersObj instanceof List<?>) {
+                    List<?> answersList = (List<?>) answersObj;
+
+                    for (Object item : answersList) {
+                        if (item instanceof Map) {
+                            Map<String, Object> ans = (Map<String, Object>) item;
+
+                            String question = ans.get("question") != null ? ans.get("question").toString() : "";
+                            Object value = ans.get("answer");
+
+                            if (question.equalsIgnoreCase("email") && value != null) {
+                                email = value.toString();
+                                break;
+                            }
+                        }
                     }
                 }
+
+                // Case 2: If answersObj is a JSON String → convert to List
+                else if (answersObj instanceof String) {
+                    ObjectMapper mapper = new ObjectMapper();
+                    List<Map<String, Object>> answersList =
+                            mapper.readValue((String) answersObj, new TypeReference<List<Map<String, Object>>>() {});
+
+                    for (Map<String, Object> ans : answersList) {
+                        String question = ans.get("question") != null ? ans.get("question").toString() : "";
+                        Object value = ans.get("answer");
+
+                        if (question.equalsIgnoreCase("email") && value != null) {
+                            email = value.toString();
+                            break;
+                        }
+                    }
+                }
+
+                // Case 3: If stored as JSONB / JsonNode
+                else if (answersObj instanceof JsonNode) {
+                    JsonNode arr = (JsonNode) answersObj;
+
+                    for (JsonNode ans : arr) {
+                        String question = ans.get("question").asText("");
+                        JsonNode answerNode = ans.get("answer");
+
+                        if (question.equalsIgnoreCase("email") && answerNode != null) {
+                            email = answerNode.asText();
+                            break;
+                        }
+                    }
+                }
+
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to parse answers: " + e.getMessage());
             }
 
-            // If email found → check duplicate submission
-            if (email != null && Boolean.TRUE.equals(
-                    responseRepository.existsByEmail(response.getFormId(), email)
-            )) {
+            // Duplicate submission check
+            if (email != null && responseRepository.existsByEmail(response.getFormId(), email)) {
                 throw new RuntimeException("User already submitted response");
             }
         }
