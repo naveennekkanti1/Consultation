@@ -20,4 +20,5 @@ public class JobModel {
     private String postedDate;
     private String lastDate;
     private String jobPostUrl;
+    private int applyClicks = 0;
 }
