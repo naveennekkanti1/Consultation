@@ -1,19 +1,17 @@
 package org.example.entity;
 
-import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
-import org.springframework.boot.autoconfigure.domain.EntityScan;
+import lombok.Data;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@EntityScan
-@AllArgsConstructor
-@lombok.Data
-@NoArgsConstructor
-@Document(collection = "Meeting_details")
+@Data
+@Document(collection = "meetings")
 public class MeetingModel {
+    @Id
+    private String id;
     private String meetingName;
-    private String meetingDate;
-    private String meetingTime;
+    private String meetingDate;       // accepts "06-06-2026"
+    private String meetingTime;       // accepts "3:00"
     private String meetingDescription;
     private String meetingLocation;
     private String contactName;

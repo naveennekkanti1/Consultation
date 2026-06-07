@@ -4,7 +4,6 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.example.repository.NewsLetterRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -20,12 +19,10 @@ public class EmailServiceNewsLetter {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
             helper.setFrom("srmcorporationservices@gmail.com");
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
-
             mailSender.send(message);
         } catch (MessagingException e) {
             throw new RuntimeException("Failed to send email", e);
@@ -40,8 +37,19 @@ public class EmailServiceNewsLetter {
 
     public void sendWeeklyEmail(String to, String content) {
         String subject = "Weekly Newsletter from SolAi";
-        String body = buildweeklyNewsTemplate(content);
+
+        // ✅ FIX: If content is already a full HTML page, send it directly.
+        // Only wrap it if it's a plain fragment (no <html> tag).
+        String body = isFullHtml(content) ? content : buildweeklyNewsTemplate(content);
+
         sendHtmlEmail(to, subject, body);
+    }
+
+    // ✅ Check if the content is already a complete HTML document
+    private boolean isFullHtml(String content) {
+        if (content == null) return false;
+        String trimmed = content.trim().toLowerCase();
+        return trimmed.startsWith("<!doctype html") || trimmed.startsWith("<html");
     }
 
     private String buildWelcomeEmailTemplate(String to) {
@@ -60,9 +68,7 @@ public class EmailServiceNewsLetter {
             </head>
             <body>
                 <div class="container">
-                    <div class="header">
-                        <h1>Welcome to SolAi!</h1>
-                    </div>
+                    <div class="header"><h1>Welcome to SolAi!</h1></div>
                     <div class="content">
                         <h2>Thank you for subscribing!</h2>
                         <p>We're excited to have you join our community of AI enthusiasts and business innovators.</p>
@@ -76,7 +82,7 @@ public class EmailServiceNewsLetter {
                         <a href="https://aisolai.vercel.app" class="button">Visit Our Website</a>
                     </div>
                     <div class="footer">
-                        <p>© 2023 SolAi. All rights reserved.</p>
+                        <p>© 2024 SolAi. All rights reserved.</p>
                         <p>24th Main road, HSR Layout, Bengaluru, Karnataka, 560012</p>
                     </div>
                 </div>
@@ -85,6 +91,7 @@ public class EmailServiceNewsLetter {
             """;
     }
 
+    // ✅ This is only used now when content is a plain text/HTML fragment, not a full page
     private String buildweeklyNewsTemplate(String content) {
         return """
             <!DOCTYPE html>
@@ -101,17 +108,15 @@ public class EmailServiceNewsLetter {
             </head>
             <body>
                 <div class="container">
-                    <div class="header">
-                        <h1>SolAi Weekly Newsletter</h1>
-                    </div>
-                    <div class="content">
-                        %s
-                    </div>
+                    <div class="header"><h1>SolAi Weekly Newsletter</h1></div>
+                    <div class="content">%s</div>
                     <div class="footer">
-                        <p>© 2023 SolAi. All rights reserved.</p>
-                        <p>24th Main Road,HSR Layout, Bengaluru, Karnataka, 560013</p>
+                        <p>© 2024 SolAi. All rights reserved.</p>
+                        <p>24th Main Road, HSR Layout, Bengaluru, Karnataka, 560013</p>
                         <div class="unsubscribe">
-                            <p>Don't want to receive these emails? <a href="https://aisolai.vercel.app/unsubscribe" style="color: #2563eb;">Unsubscribe</a></p>
+                            <p>Don't want these emails? 
+                               <a href="https://aisolai.vercel.app/unsubscribe" style="color:#2563eb;">Unsubscribe</a>
+                            </p>
                         </div>
                     </div>
                 </div>
