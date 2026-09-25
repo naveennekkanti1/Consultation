@@ -7,11 +7,11 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 public class FormAccessListRequest {
 
     private List<String> emails;
 
-    private boolean sendEmail;
+    private boolean sendEmail = true;
 }

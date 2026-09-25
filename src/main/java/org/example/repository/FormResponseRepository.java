@@ -8,12 +8,12 @@ import java.util.List;
 public interface FormResponseRepository
         extends MongoRepository<FormResponse, String> {
 
-    List<FormResponse> findByFormId(String formId);
+    List<FormResponse> findByFormId(
+            String formId
+    );
 
     boolean existsByFormIdAndRespondentEmail(
             String formId,
             String respondentEmail
     );
-
-    long countByFormId(String formId);
 }
