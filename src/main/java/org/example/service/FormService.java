@@ -1,12 +1,11 @@
 package org.example.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.constants.constant;
+import org.example.dto.FormAccessListRequest;
 import org.example.entity.Form;
 import org.example.entity.FormResponse;
+import org.example.entity.FormSettings;
 import org.example.repository.FormRepository;
-import org.example.constants.constant;
 import org.example.repository.FormResponseRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.SimpleMailMessage;
@@ -15,194 +14,517 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
 import java.time.Instant;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class FormService {
+
     @Autowired
     private FormRepository formRepository;
 
     @Autowired
-    JavaMailSender javaMailSender;
+    private FormResponseRepository responseRepository;
 
     @Autowired
-    private FormResponseRepository responseRepository;
+    private JavaMailSender javaMailSender;
+
+
+    // ============================================================
+    // CREATE FORM
+    // ============================================================
 
     public Form createForm(Form form) {
 
         Assert.notNull(form, "Form must not be null");
 
+        if (form.getAllowedEmails() == null) {
+            form.setAllowedEmails(new ArrayList<>());
+        }
+
+        if (form.getFormsettings() == null) {
+            form.setFormsettings(new FormSettings());
+        }
+
         return formRepository.save(form);
     }
 
 
-    public Form updateForm(String formId,Form updatedForm) {
-        Form existingForm = formRepository.findById(formId)
-                .orElseThrow(() -> new NoSuchElementException("Form not found with id: " + formId));
+    // ============================================================
+    // UPDATE FORM
+    // ============================================================
 
-        // update fields
+    public Form updateForm(String formId, Form updatedForm) {
+
+        Form existingForm = getForm(formId);
+
         existingForm.setTitle(updatedForm.getTitle());
         existingForm.setDescription(updatedForm.getDescription());
         existingForm.setFields(updatedForm.getFields());
         existingForm.setFormsettings(updatedForm.getFormsettings());
 
+        // Do not accidentally delete access list
+        // unless explicitly provided.
+        if (updatedForm.getAllowedEmails() != null) {
+            existingForm.setAllowedEmails(
+                    normalizeEmails(updatedForm.getAllowedEmails())
+            );
+        }
+
         return formRepository.save(existingForm);
     }
 
+
+    // ============================================================
+    // DELETE FORM
+    // ============================================================
+
     public void deleteForm(String formId) {
 
-        Form form = formRepository.findById(formId)
-                .orElseThrow(() -> new NoSuchElementException("Form not found with id: " + formId));
+        Form form = getForm(formId);
 
         formRepository.delete(form);
-    }
-    public void sendFormToRecipients(String formId, List<String> recipients, String subject) {
-        String formLink = "http://your-frontend-url.com/forms/" + formId;
-        try {
-            for (String email : recipients) {
-                SimpleMailMessage message = new SimpleMailMessage();
-                message.setTo(email);
-                message.setSubject(subject);
-                message.setText(
-                        "Hello,\n\n" +
-                                "A new form has been created. Click the link below to fill it:\n" +
-                                formLink + "\n\n" +
-                                "Regards,\nAdmin"
-                );
-                javaMailSender.send(message);
-            }
-        }catch (Exception e) {
-            throw new EmailSendException(
-                    constant.EMAIL_SENT_FAILED,e.getMessage()
-            );
-        }
+
+        // Optional: delete all responses also
+        List<FormResponse> responses =
+                responseRepository.findByFormId(formId);
+
+        responseRepository.deleteAll(responses);
     }
 
 
-    public FormResponse saveResponse(FormResponse response) {
+    // ============================================================
+    // GET FORM
+    // ============================================================
 
-        // 1️⃣ Fetch form
-        Form form = formRepository.findById(response.getFormId())
-                .orElseThrow(() -> new RuntimeException("Form Not Found"));
+    public Form getForm(String formId) {
 
-        // 2️⃣ Validate deadline
-        if (form.getFormsettings() != null && form.getFormsettings().getDeadline() != null) {
-            try {
-                // Parse ISO 8601 format or datetime-local format
-                String deadlineStr = form.getFormsettings().getDeadline();
-                Instant deadlineInstant;
-
-                // Handle both "2025-11-20T11:55" and ISO format with timezone
-                if (deadlineStr.contains("T") && !deadlineStr.contains("Z") && !deadlineStr.contains("+")) {
-                    // datetime-local format: "2025-11-20T11:55"
-                    deadlineInstant = Instant.parse(deadlineStr + ":00Z");
-                } else {
-                    // ISO format with timezone
-                    deadlineInstant = Instant.parse(deadlineStr);
-                }
-
-                Instant now = Instant.now();
-
-                if (now.isAfter(deadlineInstant)) {
-                    throw new RuntimeException("Form deadline expired");
-                }
-            } catch (Exception e) {
-                System.err.println("Error parsing deadline: " + form.getFormsettings().getDeadline());
-                e.printStackTrace();
-                throw new RuntimeException("Invalid deadline format: " + e.getMessage());
-            }
-        }
-
-        // 3️⃣ Check for multiple responses
-        if (form.getFormsettings() != null && !form.getFormsettings().isAllowedMultipleResponses()) {
-
-            String email = null;
-
-            Object answersObj = response.getAnswers();
-
-            try {
-                // Case 1: Already a List of LinkedHashMaps (from JSON)
-                if (answersObj instanceof List<?>) {
-                    List<?> answersList = (List<?>) answersObj;
-
-                    for (Object item : answersList) {
-                        if (item instanceof Map) {
-                            Map<String, Object> ans = (Map<String, Object>) item;
-
-                            String question = ans.get("question") != null ? ans.get("question").toString() : "";
-                            Object value = ans.get("answer");
-
-                            if (question.equalsIgnoreCase("email") && value != null) {
-                                email = value.toString();
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                // Case 2: If answersObj is a JSON String → convert to List
-                else if (answersObj instanceof String) {
-                    ObjectMapper mapper = new ObjectMapper();
-                    List<Map<String, Object>> answersList =
-                            mapper.readValue((String) answersObj, new TypeReference<List<Map<String, Object>>>() {});
-
-                    for (Map<String, Object> ans : answersList) {
-                        String question = ans.get("question") != null ? ans.get("question").toString() : "";
-                        Object value = ans.get("answer");
-
-                        if (question.equalsIgnoreCase("email") && value != null) {
-                            email = value.toString();
-                            break;
-                        }
-                    }
-                }
-
-                // Case 3: If stored as JSONB / JsonNode
-                else if (answersObj instanceof JsonNode) {
-                    JsonNode arr = (JsonNode) answersObj;
-
-                    for (JsonNode ans : arr) {
-                        String question = ans.get("question").asText("");
-                        JsonNode answerNode = ans.get("answer");
-
-                        if (question.equalsIgnoreCase("email") && answerNode != null) {
-                            email = answerNode.asText();
-                            break;
-                        }
-                    }
-                }
-
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to parse answers: " + e.getMessage());
-            }
-
-            // Duplicate submission check
-            if (email != null && responseRepository.existsByEmail(response.getFormId(), email)) {
-                throw new RuntimeException("User already submitted response");
-            }
-        }
-
-
-        response.setSubmittedAt(System.currentTimeMillis());
-        return responseRepository.save(response);
+        return formRepository.findById(formId)
+                .orElseThrow(() ->
+                        new NoSuchElementException(
+                                "Form not found with id: " + formId
+                        ));
     }
+
+
+    // ============================================================
+    // GET ALL FORMS
+    // ============================================================
 
     public List<Form> getAllForms() {
         return formRepository.findAll();
     }
 
 
+    // ============================================================
+    // ADD ACCESS TO FORM
+    // ============================================================
+
+    public Form addAccess(
+            String formId,
+            FormAccessListRequest request
+    ) {
+
+        Form form = getForm(formId);
+
+        if (request == null ||
+                request.getEmails() == null ||
+                request.getEmails().isEmpty()) {
+
+            throw new IllegalArgumentException(
+                    "At least one email is required"
+            );
+        }
+
+        if (form.getAllowedEmails() == null) {
+            form.setAllowedEmails(new ArrayList<>());
+        }
+
+        List<String> newEmails = normalizeEmails(request.getEmails());
+
+        for (String email : newEmails) {
+
+            if (!form.getAllowedEmails().contains(email)) {
+                form.getAllowedEmails().add(email);
+            }
+
+            if (request.isSendEmail()) {
+                sendFormEmail(
+                        email,
+                        form
+                );
+            }
+        }
+
+        return formRepository.save(form);
+    }
+
+
+    // ============================================================
+    // REMOVE ACCESS
+    // ============================================================
+
+    public Form removeAccess(
+            String formId,
+            String email
+    ) {
+
+        Form form = getForm(formId);
+
+        if (form.getAllowedEmails() == null) {
+            return form;
+        }
+
+        String normalizedEmail =
+                email.trim().toLowerCase();
+
+        form.getAllowedEmails().remove(normalizedEmail);
+
+        return formRepository.save(form);
+    }
+
+
+    // ============================================================
+    // GET USERS WITH ACCESS
+    // ============================================================
+
+    public List<String> getAllowedEmails(String formId) {
+
+        Form form = getForm(formId);
+
+        if (form.getAllowedEmails() == null) {
+            return new ArrayList<>();
+        }
+
+        return form.getAllowedEmails();
+    }
+
+
+    // ============================================================
+    // SEND FORM TO EMAIL
+    // ============================================================
+
+    public void sendFormToRecipients(
+            String formId,
+            List<String> recipients,
+            String subject
+    ) {
+
+        Form form = getForm(formId);
+
+        if (recipients == null || recipients.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Recipients cannot be empty"
+            );
+        }
+
+        for (String email : recipients) {
+
+            String normalizedEmail =
+                    email.trim().toLowerCase();
+
+            // If private form, only send to users with access
+            if (!isPublic(form) &&
+                    !hasAccess(form, normalizedEmail)) {
+
+                continue;
+            }
+
+            sendFormEmail(
+                    normalizedEmail,
+                    form,
+                    subject
+            );
+        }
+    }
+
+
+    // ============================================================
+    // SEND EMAIL
+    // ============================================================
+
+    private void sendFormEmail(
+            String email,
+            Form form
+    ) {
+
+        sendFormEmail(
+                email,
+                form,
+                "You have been invited to complete a form"
+        );
+    }
+
+
+    private void sendFormEmail(
+            String email,
+            Form form,
+            String subject
+    ) {
+
+        String formLink =
+                "http://your-frontend-url.com/forms/"
+                        + form.getId();
+
+        try {
+
+            SimpleMailMessage message =
+                    new SimpleMailMessage();
+
+            message.setTo(email);
+            message.setSubject(subject);
+
+            message.setText(
+                    "Hello,\n\n" +
+                            "You have been invited to complete the following form:\n\n" +
+                            form.getTitle() +
+                            "\n\n" +
+                            "Please click the link below:\n" +
+                            formLink +
+                            "\n\n" +
+                            "Regards,\n" +
+                            "Admin"
+            );
+
+            javaMailSender.send(message);
+
+        } catch (Exception e) {
+
+            throw new RuntimeException(
+                    constant.EMAIL_SENT_FAILED +
+                            ": " +
+                            e.getMessage()
+            );
+        }
+    }
+
+
+    // ============================================================
+    // SUBMIT FORM
+    // ============================================================
+
+    public FormResponse saveResponse(FormResponse response) {
+
+        if (response == null) {
+            throw new IllegalArgumentException(
+                    "Response cannot be null"
+            );
+        }
+
+        if (response.getFormId() == null ||
+                response.getFormId().isBlank()) {
+
+            throw new IllegalArgumentException(
+                    "Form ID is required"
+            );
+        }
+
+        // --------------------------------------------------------
+        // GET FORM
+        // --------------------------------------------------------
+
+        Form form = formRepository
+                .findById(response.getFormId())
+                .orElseThrow(() ->
+                        new NoSuchElementException(
+                                "Form not found"
+                        ));
+
+
+        // --------------------------------------------------------
+        // CHECK DEADLINE
+        // --------------------------------------------------------
+
+        validateDeadline(form);
+
+
+        // --------------------------------------------------------
+        // EMAIL REQUIRED
+        // --------------------------------------------------------
+
+        String email = response.getRespondentEmail();
+
+        if (email == null || email.isBlank()) {
+
+            throw new IllegalArgumentException(
+                    "Respondent email is required"
+            );
+        }
+
+        email = email.trim().toLowerCase();
+
+        response.setRespondentEmail(email);
+
+
+        // --------------------------------------------------------
+        // PRIVATE FORM CHECK
+        // --------------------------------------------------------
+
+        if (!isPublic(form)) {
+
+            if (!hasAccess(form, email)) {
+
+                throw new RuntimeException(
+                        "You do not have access to this form"
+                );
+            }
+        }
+
+
+        // --------------------------------------------------------
+        // UNIQUE RESPONSE CHECK
+        // --------------------------------------------------------
+
+        if (!isMultipleResponsesAllowed(form)) {
+
+            boolean alreadySubmitted =
+                    responseRepository
+                            .existsByFormIdAndRespondentEmail(
+                                    response.getFormId(),
+                                    email
+                            );
+
+            if (alreadySubmitted) {
+
+                throw new RuntimeException(
+                        "You have already submitted this form"
+                );
+            }
+        }
+
+
+        // --------------------------------------------------------
+        // SAVE
+        // --------------------------------------------------------
+
+        response.setSubmittedAt(
+                System.currentTimeMillis()
+        );
+
+        return responseRepository.save(response);
+    }
+
+
+    // ============================================================
+    // GET RESPONSES
+    // ============================================================
+
     public List<FormResponse> getResponses(String formId) {
+
         return responseRepository.findByFormId(formId);
     }
 
-    public Form getForm(String formId) {
-        return formRepository.findById(formId)
-                .orElseThrow(() -> new NoSuchElementException("Form not found with id: " + formId));
+
+    // ============================================================
+    // HELPER - PUBLIC FORM
+    // ============================================================
+
+    private boolean isPublic(Form form) {
+
+        return form.getFormsettings() != null &&
+                form.getFormsettings().isPublicForm();
     }
 
+
+    // ============================================================
+    // HELPER - MULTIPLE RESPONSES
+    // ============================================================
+
+    private boolean isMultipleResponsesAllowed(Form form) {
+
+        return form.getFormsettings() != null &&
+                form.getFormsettings()
+                        .isAllowedMultipleResponses();
+    }
+
+
+    // ============================================================
+    // HELPER - ACCESS
+    // ============================================================
+
+    private boolean hasAccess(
+            Form form,
+            String email
+    ) {
+
+        if (form.getAllowedEmails() == null) {
+            return false;
+        }
+
+        String normalizedEmail =
+                email.trim().toLowerCase();
+
+        return form.getAllowedEmails()
+                .stream()
+                .filter(Objects::nonNull)
+                .map(e -> e.trim().toLowerCase())
+                .anyMatch(e ->
+                        e.equals(normalizedEmail)
+                );
+    }
+
+
+    // ============================================================
+    // HELPER - DEADLINE
+    // ============================================================
+
+    private void validateDeadline(Form form) {
+
+        if (form.getFormsettings() == null) {
+            return;
+        }
+
+        String deadline =
+                form.getFormsettings().getDeadline();
+
+        if (deadline == null ||
+                deadline.isBlank()) {
+
+            return;
+        }
+
+        try {
+
+            Instant deadlineInstant =
+                    Instant.parse(deadline);
+
+            if (Instant.now().isAfter(deadlineInstant)) {
+
+                throw new RuntimeException(
+                        "Form deadline expired"
+                );
+            }
+
+        } catch (RuntimeException e) {
+
+            throw e;
+
+        } catch (Exception e) {
+
+            throw new RuntimeException(
+                    "Invalid deadline format"
+            );
+        }
+    }
+
+
+    // ============================================================
+    // HELPER - NORMALIZE EMAILS
+    // ============================================================
+
+    private List<String> normalizeEmails(
+            List<String> emails
+    ) {
+
+        return emails.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .map(String::toLowerCase)
+                .filter(e -> !e.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
+    }
 }

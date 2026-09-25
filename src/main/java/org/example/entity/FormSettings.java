@@ -4,12 +4,22 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+@Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 public class FormSettings {
-    private boolean isAllowedMultipleResponses;
-    private boolean isEditAfterSubmit;
+
+    // true  = users can submit multiple times
+    // false = only one response per email
+    private boolean allowedMultipleResponses;
+
+    // Whether user can edit after submitting
+    private boolean editAfterSubmit;
+
+    // ISO date/time
     private String deadline;
-    private boolean ispublic;
+
+    // true  = anyone can access
+    // false = only users in allowedEmails
+    private boolean publicForm;
 }

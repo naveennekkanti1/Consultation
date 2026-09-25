@@ -3,16 +3,14 @@ package org.example.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.example.entity.Form;
-
-import java.util.List;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class FormRequest {
+public class FormAccessRequest {
 
-    private Form form;
+    private String email;
 
-    private List<String> recipients;
+    // true = send email immediately
+    private boolean sendEmail;
 }
